@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "Distraction Duck",
+  "version": "0.1.0",
+  "description": "Name a task and one distracting website, then start a focus session.",
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Distraction Duck"
+  }
+}
