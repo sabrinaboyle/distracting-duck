@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Distraction Duck</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main>
+      <h1>Distraction Duck</h1>
+      <p id="intro">Name the task you want to work on, and one website that distracts you.</p>
+
+      <form id="session-form">
+        <div class="field">
+          <label for="task">Task</label>
+          <input
+            id="task"
+            name="task"
+            type="text"
+            autocomplete="off"
+            maxlength="160"
+            autofocus
+          >
+        </div>
+
+        <div class="field">
+          <label for="distraction">Distracting website</label>
+          <input
+            id="distraction"
+            name="distraction"
+            type="url"
+            autocomplete="off"
+            spellcheck="false"
+            maxlength="200"
+            placeholder="https://example.com"
+            aria-describedby="distraction-hint"
+          >
+          <p id="distraction-hint" class="hint">Use a full address, such as https://example.com.</p>
+        </div>
+
+        <button type="button">Start focus session</button>
+      </form>
+    </main>
+  </body>
+</html>
