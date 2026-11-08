@@ -6,7 +6,7 @@ const context = { console, URL, Math, Date, Set, Map, Array, Object };
 vm.createContext(context);
 
 const root = path.join(__dirname, "..");
-for (const file of ["settings.js", "site-match.js", "meter.js", "session.js", "suggestions.js"]) {
+for (const file of ["settings.js", "site-match.js", "meter.js", "session.js", "suggestions.js", "gemini-pool.js"]) {
   vm.runInContext(fs.readFileSync(path.join(root, file), "utf8"), context);
 }
 
@@ -86,5 +86,20 @@ const loonLine = context.distractionDuckSuggestionForMode("locked-in-loon", "dis
 assert(loonLine.id !== duckLine.id, "mode switch drops other-mode suggestion ids");
 const cycled = context.distractionDuckNextSuggestion("locked-in-loon", "distract", loonLine.id);
 assert(cycled.id !== loonLine.id, "cycle suggestion inside one mode");
+
+const emptyPool = context.distractionDuckNormalizeGeminiPool(null);
+assert(emptyPool["distracted-duck"].length === 0, "empty gemini pool");
+const filled = context.distractionDuckAddGeminiPooled(
+  emptyPool,
+  "distracted-duck",
+  [" Stretch, then come back. ", "Stretch, then come back.", "Open a tiny doodle, then return."],
+  3,
+);
+assert(filled["distracted-duck"].length === 2, "dedupe pooled gemini lines");
+const taken = context.distractionDuckTakeGeminiPooled(filled, "distracted-duck");
+assert(taken.text === "Stretch, then come back.", "take first pooled line");
+assert(taken.pool["distracted-duck"].length === 1, "pool shrinks after take");
+assert(context.distractionDuckGeminiPoolNeedsFill(taken.pool, "distracted-duck", 3) === true, "pool needs refill");
+assert(context.distractionDuckGeminiPoolNeedsFill(filled, "not-a-bird", 3) === false, "unknown mode skip");
 
 console.log("logic tests passed");

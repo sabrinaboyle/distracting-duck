@@ -18,11 +18,11 @@ const DEFAULT_MODELS = [
 
 const MODE_PROMPTS = {
   "distracted-duck":
-    "You are Distracted Duck, a playful Chrome-extension bird. Write one short suggestion (one or two sentences) that offers a harmless, silly detour and then a nudge back to work.",
+    "You are Distracted Duck, a playful Chrome-extension bird. Each short suggestion (one or two sentences) offers a harmless, silly detour and then a nudge back to work.",
   "malicious-mallard":
-    "You are Malicious Mallard, a mischievous but not cruel Chrome-extension bird. Write one short cheeky suggestion (one or two sentences). Do not shame, insult, or attack the reader.",
+    "You are Malicious Mallard, a mischievous but not cruel Chrome-extension bird. Each short suggestion (one or two sentences) is cheeky. Do not shame, insult, or attack the reader.",
   "locked-in-loon":
-    "You are Locked-in Loon, a gentle Chrome-extension bird. Write one short encouraging or lightly reminding suggestion (one or two sentences). No guilt.",
+    "You are Locked-in Loon, a gentle Chrome-extension bird. Each short suggestion (one or two sentences) is encouraging or a light reminder. No guilt.",
 };
 
 function loadDotEnv(filePath) {
@@ -52,13 +52,27 @@ function loadDotEnv(filePath) {
   }
 }
 
-export function promptForMode(birdMode) {
+export function clampSuggestionCount(count) {
+  const parsed = Number(count);
+  if (!Number.isFinite(parsed)) {
+    return 1;
+  }
+  return Math.min(5, Math.max(1, Math.round(parsed)));
+}
+
+export function promptForMode(birdMode, count = 1) {
   const voice = MODE_PROMPTS[birdMode];
   if (!voice) {
     return null;
   }
+  const n = clampSuggestionCount(count);
+  const howMany =
+    n === 1
+      ? "Write one short suggestion (one or two sentences)."
+      : `Write ${n} short suggestions. Put each on its own line. No numbering.`;
   return [
     voice,
+    howMany,
     "Rules: reply with only the suggestion text. No title, no quotes, no list, no website URLs, no user task, no browsing history, no page content.",
   ].join(" ");
 }
@@ -96,12 +110,37 @@ function json(response, status, body) {
   response.end(payload);
 }
 
-function textFromGemini(data) {
+function rawTextFromGemini(data) {
   const parts = data?.candidates?.[0]?.content?.parts;
   if (!Array.isArray(parts)) {
     return "";
   }
-  return sanitizeSuggestion(parts.map((part) => part.text || "").join(" "));
+  return parts.map((part) => (typeof part.text === "string" ? part.text : "")).join("\n");
+}
+
+export function parseSuggestionLines(text, count = 1) {
+  const n = clampSuggestionCount(count);
+  if (typeof text !== "string") {
+    return [];
+  }
+  const unique = [];
+  const seen = new Set();
+  for (const rawLine of text.split(/\n+/)) {
+    const line = sanitizeSuggestion(rawLine.replace(/^\s*(?:[-*]|\d+[.)])\s+/, ""));
+    if (!line || seen.has(line)) {
+      continue;
+    }
+    seen.add(line);
+    unique.push(line);
+    if (unique.length >= n) {
+      break;
+    }
+  }
+  if (!unique.length) {
+    const one = sanitizeSuggestion(text);
+    return one ? [one] : [];
+  }
+  return unique;
 }
 
 async function readBody(request) {
@@ -115,8 +154,9 @@ async function readBody(request) {
   return JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}");
 }
 
-async function generateSuggestion(birdMode) {
-  const prompt = promptForMode(birdMode);
+async function generateSuggestion(birdMode, count = 1) {
+  const n = clampSuggestionCount(count);
+  const prompt = promptForMode(birdMode, n);
   const apiKey = process.env.GEMINI_API_KEY || KEY;
   if (!prompt) {
     return { status: 400, body: { error: "unknown_mode" } };
@@ -138,7 +178,7 @@ async function generateSuggestion(birdMode) {
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.9,
-          maxOutputTokens: 256,
+          maxOutputTokens: n > 1 ? 512 : 256,
         },
       }),
     });
@@ -150,14 +190,14 @@ async function generateSuggestion(birdMode) {
     }
 
     const data = await apiResponse.json();
-    const text = textFromGemini(data);
-    if (!text) {
+    const texts = parseSuggestionLines(rawTextFromGemini(data), n);
+    if (!texts.length) {
       lastError = "gemini_empty";
       console.log(`Gemini ${model} returned no text`);
       continue;
     }
-    console.log(`Gemini ${model} ok`);
-    return { status: 200, body: { text, source: "gemini" } };
+    console.log(`Gemini ${model} ok (${texts.length})`);
+    return { status: 200, body: { text: texts[0], texts, source: "gemini" } };
   }
   return { status: 502, body: { error: lastError } };
 }
@@ -188,7 +228,7 @@ export function createServer() {
       }
       const birdMode = typeof body.birdMode === "string" ? body.birdMode : "";
       try {
-        const result = await generateSuggestion(birdMode);
+        const result = await generateSuggestion(birdMode, body.count);
         json(response, result.status, result.body);
       } catch {
         json(response, 502, { error: "gemini_unavailable" });

@@ -9,6 +9,7 @@ if (window === window.top) {
       source: "prewritten",
       liveText: null,
       fallbackNote: "",
+      waitingForGemini: false,
       chain: Promise.resolve(),
     };
     chrome.storage.onChanged.addListener((changes, area) => {
@@ -77,6 +78,7 @@ async function syncPanel() {
   state.source = "prewritten";
   state.liveText = null;
   state.fallbackNote = "";
+  chrome.runtime.sendMessage({ type: "warmGeminiPool", birdMode: session.birdMode }).catch(() => {});
   mountPanel(session, startedAt);
 }
 
@@ -124,7 +126,7 @@ function updateOpenPanel(session) {
   root.querySelector("#distraction-duck-title").textContent = mode.name;
   another.disabled = state.source === "loading";
   if (state.source === "loading") {
-    message.textContent = "Asking Gemini…";
+    message.textContent = "Asking Gemini. This can take up to a minute…";
     sourceLine.hidden = true;
     sourceLine.textContent = "";
     openButton.hidden = true;
@@ -302,22 +304,37 @@ function mountPanel(session, startedAt) {
       return;
     }
     const state = window.distractionDuckPanel;
-    state.source = "loading";
-    state.liveText = null;
-    updateOpenPanel(current);
-    const result = await chrome.runtime.sendMessage({ type: "fetchSuggestion" });
-    if (result && result.ok && result.text) {
-      state.source = "gemini";
-      state.liveText = result.text;
-      state.suggestionId = "gemini-live";
-      state.fallbackNote = "";
-    } else {
-      const kind = distractionDuckClassifyPage(location.href, current) === "focus" ? "focus" : "distract";
-      const next = distractionDuckNextSuggestion(current.birdMode, kind, state.suggestionId);
-      state.source = "prewritten";
+    if (state.waitingForGemini) {
+      return;
+    }
+    state.waitingForGemini = true;
+    another.disabled = true;
+    const loadingTimer = setTimeout(() => {
+      if (!state.waitingForGemini) {
+        return;
+      }
+      state.source = "loading";
       state.liveText = null;
-      state.suggestionId = next ? next.id : null;
-      state.fallbackNote = "Gemini did not reply, so this is a saved line.";
+      updateOpenPanel(current);
+    }, 150);
+    try {
+      const result = await chrome.runtime.sendMessage({ type: "fetchSuggestion" });
+      if (result && result.ok && result.text) {
+        state.source = "gemini";
+        state.liveText = result.text;
+        state.suggestionId = "gemini-live";
+        state.fallbackNote = "";
+      } else {
+        const kind = distractionDuckClassifyPage(location.href, current) === "focus" ? "focus" : "distract";
+        const next = distractionDuckNextSuggestion(current.birdMode, kind, state.suggestionId);
+        state.source = "prewritten";
+        state.liveText = null;
+        state.suggestionId = next ? next.id : null;
+        state.fallbackNote = "Gemini did not reply, so this is a saved line.";
+      }
+    } finally {
+      clearTimeout(loadingTimer);
+      state.waitingForGemini = false;
     }
     updateOpenPanel(current);
   });
