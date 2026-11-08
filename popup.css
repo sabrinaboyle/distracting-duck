@@ -12,6 +12,7 @@
   --button-text: #ffffff;
   --focus: #1d4ed8;
   --stripe: #b45309;
+  --error: #7f1d1d;
 }
 
 *,
@@ -37,16 +38,72 @@ main {
   border-top: 0.375rem solid var(--stripe);
 }
 
-h1 {
+h1,
+h2 {
   margin: 0 0 0.35rem;
-  font-size: 1.375rem;
   line-height: 1.2;
   font-weight: 700;
 }
 
-#intro {
+h1 {
+  font-size: 1.375rem;
+}
+
+h2 {
+  margin-bottom: 0.9rem;
+  font-size: 1.125rem;
+}
+
+h2:focus-visible,
+#form-error:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+#intro,
+#loading {
   margin: 0 0 1.1rem;
   color: var(--muted);
+}
+
+#loading[hidden],
+section[hidden] {
+  display: none;
+}
+
+#form-error {
+  margin: 0;
+  color: var(--error);
+  font-weight: 600;
+}
+
+dl {
+  margin: 0 0 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+dt {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+dd {
+  margin: 0.15rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+#active-work-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.work-url {
+  color: var(--muted);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
 }
 
 form {
@@ -107,6 +164,10 @@ button {
 button:hover {
   background: var(--button-hover);
   border-color: var(--button-hover);
+}
+
+button:disabled {
+  cursor: default;
 }
 
 input:focus-visible,
