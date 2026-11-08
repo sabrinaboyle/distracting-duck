@@ -40,7 +40,7 @@
               placeholder="https://example.com"
               aria-describedby="distraction-hint"
             >
-            <p id="distraction-hint" class="hint">Use a full address, such as https://example.com.</p>
+            <p id="distraction-hint" class="hint">Use a full address, such as https://example.com. Chrome asks to allow that website when you start.</p>
           </div>
 
           <button id="start-button" type="submit">Start focus session</button>
@@ -63,9 +63,11 @@
             <dd id="active-work-tab"></dd>
           </div>
         </dl>
+        <p class="hint">Malicious Mallard appears on that website while this session is active.</p>
         <button id="stop-button" type="button">Stop focus session</button>
       </section>
     </main>
+    <script src="site-match.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

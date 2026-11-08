@@ -1,9 +1,13 @@
 {
   "manifest_version": 3,
   "name": "Distraction Duck",
-  "version": "0.2.0",
-  "description": "Start a focus session for your task, one distracting website, and the current tab.",
-  "permissions": ["storage", "activeTab"],
+  "version": "0.3.0",
+  "description": "During a focus session, Malicious Mallard appears on the distracting website you chose.",
+  "permissions": ["storage", "activeTab", "scripting"],
+  "optional_host_permissions": ["http://*/*", "https://*/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
   "action": {
     "default_popup": "popup.html",
     "default_title": "Distraction Duck"

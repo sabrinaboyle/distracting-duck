@@ -125,7 +125,7 @@ siteInput.addEventListener("invalid", (event) => {
   );
 });
 
-form.addEventListener("submit", async (event) => {
+form.addEventListener("submit", (event) => {
   event.preventDefault();
   const task = taskInput.value.trim();
   const distraction = siteInput.value.trim();
@@ -136,35 +136,59 @@ form.addEventListener("submit", async (event) => {
   }
 
   clearError();
+  const pattern = distractionDuckHostPattern(distraction);
   startButton.disabled = true;
-  try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab || typeof tab.id !== "number") {
+  chrome.permissions.request({ origins: [pattern] }).then(async (granted) => {
+    if (!granted) {
       showError(
-        "The current tab could not be saved. Stay on your work tab and try again.",
+        "Allow access to that website so Malicious Mallard can appear there.",
         formError,
       );
       return;
     }
 
-    const session = {
-      active: true,
-      task,
-      distraction,
-      workTab: {
-        id: tab.id,
-        windowId: tab.windowId,
-        title: tab.title || "",
-        url: tab.url || "",
-      },
-    };
-    await chrome.storage.local.set({ [SESSION_KEY]: session });
-    showActive(session);
-  } catch {
-    showError("The session could not be saved. Try again.", formError);
-  } finally {
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tab || typeof tab.id !== "number") {
+        try {
+          await chrome.permissions.remove({ origins: [pattern] });
+        } catch {
+          // The site grant could not be cleared.
+        }
+        showError(
+          "The current tab could not be saved. Stay on your work tab and try again.",
+          formError,
+        );
+        return;
+      }
+
+      const session = {
+        active: true,
+        task,
+        distraction,
+        startedAt: Date.now(),
+        workTab: {
+          id: tab.id,
+          windowId: tab.windowId,
+          title: tab.title || "",
+          url: tab.url || "",
+        },
+      };
+      await chrome.storage.local.set({ [SESSION_KEY]: session });
+      showActive(session);
+    } catch {
+      try {
+        await chrome.permissions.remove({ origins: [pattern] });
+      } catch {
+        // The site grant could not be cleared after the failed save.
+      }
+      showError("The session could not be saved. Try again.", formError);
+    }
+  }).catch(() => {
+    showError("The website permission could not be requested. Try again.", formError);
+  }).finally(() => {
     startButton.disabled = false;
-  }
+  });
 });
 
 stopButton.addEventListener("click", async () => {
