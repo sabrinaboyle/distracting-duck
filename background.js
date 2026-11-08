@@ -155,6 +155,36 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
 });
 
+async function fetchGeminiSuggestion() {
+  const session = await readSession();
+  if (!session) {
+    return { ok: false };
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(DISTRACTION_DUCK_SETTINGS.suggestionUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ birdMode: session.birdMode }),
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      return { ok: false };
+    }
+    const payload = await response.json();
+    const text = typeof payload.text === "string" ? payload.text.trim() : "";
+    if (!text || payload.source !== "gemini") {
+      return { ok: false };
+    }
+    return { ok: true, text, source: "gemini" };
+  } catch {
+    return { ok: false };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (!message || typeof message !== "object") {
     return;
@@ -179,6 +209,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       () => sendResponse({ ok: true }),
       () => sendResponse({ ok: false }),
     );
+    return true;
+  }
+  if (message.type === "fetchSuggestion") {
+    fetchGeminiSuggestion()
+      .then(sendResponse)
+      .catch(() => sendResponse({ ok: false }));
     return true;
   }
   if (message.type === "pauseSession") {

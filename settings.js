@@ -1,6 +1,7 @@
 var DISTRACTION_DUCK_SETTINGS = {
   maxSitesPerList: 8,
   idleSeconds: 30,
+  suggestionUrl: "http://127.0.0.1:8787/suggestion",
   meter: {
     min: 0,
     max: 100,
