@@ -1,4 +1,4 @@
-importScripts("settings.js", "site-match.js", "meter.js", "session.js", "suggestions.js");
+importScripts("settings.js", "site-match.js", "meter.js", "session.js", "suggestions.js", "gemini-pool.js");
 
 let browserFocused = true;
 
@@ -148,41 +148,145 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
   if (!previous && next) {
     refreshMeterAndPanels().catch(() => {});
+    fillGeminiPoolSoon(next.birdMode);
     return;
   }
   if (next) {
+    if (previous && previous.birdMode !== next.birdMode) {
+      fillGeminiPoolSoon(next.birdMode);
+    }
     syncPanels(next).catch(() => {});
   }
 });
 
-async function fetchGeminiSuggestion() {
+const geminiInflight = {};
+let geminiPoolGate = Promise.resolve();
+
+function withGeminiPoolGate(work) {
+  const run = geminiPoolGate.then(work, work);
+  geminiPoolGate = run.then(
+    () => {},
+    () => {},
+  );
+  return run;
+}
+
+async function readGeminiPool() {
+  const stored = await chrome.storage.local.get(DISTRACTION_DUCK_GEMINI_POOL_KEY);
+  return distractionDuckNormalizeGeminiPool(stored[DISTRACTION_DUCK_GEMINI_POOL_KEY]);
+}
+
+async function writeGeminiPool(pool) {
+  await chrome.storage.local.set({
+    [DISTRACTION_DUCK_GEMINI_POOL_KEY]: distractionDuckNormalizeGeminiPool(pool),
+  });
+}
+
+function suggestionTextsFromPayload(payload) {
+  if (!payload || payload.source !== "gemini") {
+    return [];
+  }
+  const fromList = Array.isArray(payload.texts)
+    ? payload.texts.filter((item) => typeof item === "string" && item.trim())
+    : [];
+  if (fromList.length) {
+    return fromList.map((item) => item.trim());
+  }
+  const one = typeof payload.text === "string" ? payload.text.trim() : "";
+  return one ? [one] : [];
+}
+
+async function fetchGeminiSuggestions(birdMode, count) {
+  const n = Math.min(5, Math.max(1, Number(count) || 1));
+  if (geminiInflight[birdMode]) {
+    return geminiInflight[birdMode];
+  }
+  geminiInflight[birdMode] = (async () => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), DISTRACTION_DUCK_SETTINGS.geminiTimeoutMs);
+    try {
+      const response = await fetch(DISTRACTION_DUCK_SETTINGS.suggestionUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ birdMode, count: n }),
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        return { ok: false, reason: "gemini_http" };
+      }
+      const payload = await response.json();
+      const texts = suggestionTextsFromPayload(payload);
+      if (!texts.length) {
+        return { ok: false, reason: "gemini_empty" };
+      }
+      return { ok: true, texts };
+    } catch {
+      return { ok: false, reason: "gemini_network" };
+    } finally {
+      clearTimeout(timer);
+    }
+  })().finally(() => {
+    delete geminiInflight[birdMode];
+  });
+  return geminiInflight[birdMode];
+}
+
+async function popGeminiPooled(birdMode) {
+  return withGeminiPoolGate(async () => {
+    const taken = distractionDuckTakeGeminiPooled(await readGeminiPool(), birdMode);
+    await writeGeminiPool(taken.pool);
+    return taken.text;
+  });
+}
+
+async function fillGeminiPoolToSize(birdMode) {
+  if (!birdMode) {
+    return;
+  }
+  const pool = await readGeminiPool();
+  if (!distractionDuckGeminiPoolNeedsFill(pool, birdMode, DISTRACTION_DUCK_SETTINGS.geminiPoolSize)) {
+    return;
+  }
+  const need = DISTRACTION_DUCK_SETTINGS.geminiPoolSize - pool[birdMode].length;
+  const fetched = await fetchGeminiSuggestions(birdMode, Math.max(need, DISTRACTION_DUCK_SETTINGS.geminiPoolSize));
+  if (!fetched.ok) {
+    return;
+  }
+  await withGeminiPoolGate(async () => {
+    const latest = await readGeminiPool();
+    await writeGeminiPool(
+      distractionDuckAddGeminiPooled(
+        latest,
+        birdMode,
+        fetched.texts,
+        DISTRACTION_DUCK_SETTINGS.geminiPoolSize,
+      ),
+    );
+  });
+}
+
+function fillGeminiPoolSoon(birdMode) {
+  fillGeminiPoolToSize(birdMode).catch(() => {});
+}
+
+async function takeGeminiSuggestion() {
   const session = await readSession();
   if (!session) {
-    return { ok: false };
+    return { ok: false, reason: "no_session" };
   }
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
-  try {
-    const response = await fetch(DISTRACTION_DUCK_SETTINGS.suggestionUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ birdMode: session.birdMode }),
-      signal: controller.signal,
-    });
-    if (!response.ok) {
-      return { ok: false, reason: "gemini_http" };
-    }
-    const payload = await response.json();
-    const text = typeof payload.text === "string" ? payload.text.trim() : "";
-    if (!text || payload.source !== "gemini") {
-      return { ok: false, reason: "gemini_empty" };
-    }
+  const birdMode = session.birdMode;
+  let text = await popGeminiPooled(birdMode);
+  if (text) {
+    fillGeminiPoolSoon(birdMode);
     return { ok: true, text, source: "gemini" };
-  } catch {
-    return { ok: false, reason: "gemini_network" };
-  } finally {
-    clearTimeout(timer);
   }
+  await fillGeminiPoolToSize(birdMode);
+  text = await popGeminiPooled(birdMode);
+  if (text) {
+    fillGeminiPoolSoon(birdMode);
+    return { ok: true, text, source: "gemini" };
+  }
+  return { ok: false, reason: "gemini_empty" };
 }
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -212,10 +316,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
   if (message.type === "fetchSuggestion") {
-    fetchGeminiSuggestion()
+    takeGeminiSuggestion()
       .then(sendResponse)
       .catch(() => sendResponse({ ok: false }));
     return true;
+  }
+  if (message.type === "warmGeminiPool") {
+    const sessionBirdMode = typeof message.birdMode === "string" ? message.birdMode : "";
+    fillGeminiPoolSoon(sessionBirdMode);
+    sendResponse({ ok: true });
+    return;
   }
   if (message.type === "pauseSession") {
     readSession().then(async (session) => {

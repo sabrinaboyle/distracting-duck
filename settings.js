@@ -2,6 +2,8 @@ var DISTRACTION_DUCK_SETTINGS = {
   maxSitesPerList: 8,
   idleSeconds: 30,
   suggestionUrl: "http://127.0.0.1:8787/suggestion",
+  geminiTimeoutMs: 60_000,
+  geminiPoolSize: 3,
   meter: {
     min: 0,
     max: 100,
