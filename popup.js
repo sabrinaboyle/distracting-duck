@@ -37,6 +37,10 @@ function selectedMode(container) {
   return container.querySelector("input[type='radio']:checked")?.value || "distracted-duck";
 }
 
+function applyPopupTheme(birdMode) {
+  document.body.dataset.birdMode = distractionDuckModeById(birdMode).id;
+}
+
 function renderModeChoices(container, name, selected) {
   container.replaceChildren();
   for (const mode of DISTRACTION_DUCK_MODES) {
@@ -88,6 +92,7 @@ function showSetup() {
     renderModeChoices(modeChoices, "bird-mode", "distracted-duck");
   }
   renderDraftLists();
+  applyPopupTheme(selectedMode(modeChoices));
   taskInput.focus();
 }
 
@@ -163,6 +168,7 @@ function showActive(session) {
   renderWorkTab(session.workTab);
   renderModeChoices(activeModeChoices, "active-bird-mode", session.birdMode);
   renderMeter(session);
+  applyPopupTheme(session.birdMode);
   startMeterTimer(session);
   if (becameVisible) {
     sessionStatus.focus({ focusVisible: true });
@@ -258,6 +264,10 @@ function setupAddField(input, button, listName) {
     }
   });
 }
+
+modeChoices.addEventListener("change", () => {
+  applyPopupTheme(selectedMode(modeChoices));
+});
 
 setupAddField(focusInput, document.querySelector("#focus-add"), "focusSites");
 setupAddField(distractInput, document.querySelector("#distract-add"), "distractingSites");

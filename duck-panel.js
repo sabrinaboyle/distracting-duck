@@ -8,6 +8,7 @@ if (window === window.top) {
       suggestionId: null,
       source: "prewritten",
       liveText: null,
+      liveUrl: "",
       fallbackNote: "",
       waitingForGemini: false,
       chain: Promise.resolve(),
@@ -59,6 +60,7 @@ async function syncPanel() {
     state.suggestionId = null;
     state.source = "prewritten";
     state.liveText = null;
+    state.liveUrl = "";
     state.fallbackNote = "";
     return;
   }
@@ -77,6 +79,7 @@ async function syncPanel() {
   state.suggestionId = first ? first.id : null;
   state.source = "prewritten";
   state.liveText = null;
+  state.liveUrl = "";
   state.fallbackNote = "";
   chrome.runtime.sendMessage({ type: "warmGeminiPool", birdMode: session.birdMode }).catch(() => {});
   mountPanel(session, startedAt);
@@ -101,7 +104,7 @@ function panelElements() {
 function suggestionFor(session) {
   const state = window.distractionDuckPanel;
   if (state.source === "gemini" && state.liveText) {
-    return { id: "gemini-live", text: state.liveText, source: "gemini" };
+    return { id: "gemini-live", text: state.liveText, url: state.liveUrl, source: "gemini" };
   }
   const kind = distractionDuckClassifyPage(location.href, session) === "focus" ? "focus" : "distract";
   const suggestion = distractionDuckSuggestionForMode(session.birdMode, kind, state.suggestionId);
@@ -124,6 +127,7 @@ function updateOpenPanel(session) {
   const message = root.querySelector("#distraction-duck-message");
   const openButton = root.querySelector("#distraction-duck-open");
   root.querySelector("#distraction-duck-title").textContent = mode.name;
+  applyPanelTheme(root, mode);
   another.disabled = state.source === "loading";
   if (state.source === "loading") {
     message.textContent = "Asking Gemini. This can take up to a minute…";
@@ -147,9 +151,11 @@ function updateOpenPanel(session) {
     if (suggestion && suggestion.url) {
       openButton.hidden = false;
       openButton.dataset.suggestionId = suggestion.id;
+      openButton.dataset.url = suggestion.url;
     } else {
       openButton.hidden = true;
       delete openButton.dataset.suggestionId;
+      delete openButton.dataset.url;
     }
   }
   const projected = distractionDuckProjectMeter(session, Date.now());
@@ -158,6 +164,22 @@ function updateOpenPanel(session) {
   fill.style.width = `${Math.round(projected.value)}%`;
   track.setAttribute("aria-valuenow", String(Math.round(projected.value)));
   track.setAttribute("aria-valuetext", distractionDuckMeterLabel(projected.value));
+}
+
+function applyPanelTheme(root, mode) {
+  const theme = mode && mode.theme ? mode.theme : DISTRACTION_DUCK_MODES[0].theme;
+  const panel = root.querySelector("section");
+  if (!panel) {
+    return;
+  }
+  panel.dataset.birdMode = mode.id;
+  panel.style.setProperty("--dd-bg", theme.bg);
+  panel.style.setProperty("--dd-ink", theme.ink);
+  panel.style.setProperty("--dd-muted", theme.muted);
+  panel.style.setProperty("--dd-stripe", theme.stripe);
+  panel.style.setProperty("--dd-button", theme.button);
+  panel.style.setProperty("--dd-button-hover", theme.buttonHover);
+  panel.style.setProperty("--dd-fill", theme.fill);
 }
 
 function mountPanel(session, startedAt) {
@@ -178,7 +200,7 @@ function mountPanel(session, startedAt) {
       right: 1rem;
       bottom: 1rem;
       display: block;
-      width: min(20rem, calc(100vw - 2rem));
+      width: min(22.5rem, calc(100vw - 2rem));
       color-scheme: light;
     }
     section {
@@ -186,11 +208,11 @@ function mountPanel(session, startedAt) {
       max-height: calc(100vh - 2rem);
       overflow: auto;
       padding: 0.9rem 1rem 1rem;
-      border: 1px solid #78716c;
-      border-top: 0.375rem solid #b45309;
+      border: 1px solid var(--dd-muted, #78716c);
+      border-top: 0.375rem solid var(--dd-stripe, #b45309);
       border-radius: 0.5rem;
-      background: #f6f3ec;
-      color: #1c1917;
+      background: var(--dd-bg, #f6f3ec);
+      color: var(--dd-ink, #1c1917);
       font: 1rem/1.45 "Segoe UI", system-ui, sans-serif;
       box-shadow: 0 0.5rem 1.5rem rgb(28 25 23 / 20%);
     }
@@ -203,6 +225,11 @@ function mountPanel(session, startedAt) {
     p {
       margin: 0 0 0.7rem;
     }
+    #distraction-duck-message {
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
     .meter-labels {
       display: flex;
       justify-content: space-between;
@@ -212,18 +239,18 @@ function mountPanel(session, startedAt) {
     .meter-track {
       height: 0.7rem;
       margin: 0.25rem 0 0.7rem;
-      border: 1px solid #78716c;
+      border: 1px solid var(--dd-muted, #78716c);
       border-radius: 999px;
-      background: #e7e5e4;
+      background: #ffffff;
       overflow: hidden;
     }
     .meter-fill {
       height: 100%;
       width: 50%;
-      background: linear-gradient(90deg, #b45309, #14352e);
+      background: var(--dd-fill, linear-gradient(90deg, #b45309, #14352e));
     }
     .hint {
-      color: #44403c;
+      color: var(--dd-muted, #44403c);
       font-size: 0.8rem;
     }
     button {
@@ -231,9 +258,9 @@ function mountPanel(session, startedAt) {
       min-height: 2.5rem;
       margin: 0 0 0.4rem;
       padding: 0.45rem 0.7rem;
-      border: 2px solid #14352e;
+      border: 2px solid var(--dd-button, #14352e);
       border-radius: 0.5rem;
-      background: #14352e;
+      background: var(--dd-button, #14352e);
       color: #ffffff;
       font: inherit;
       font-weight: 600;
@@ -241,7 +268,7 @@ function mountPanel(session, startedAt) {
     }
     button.secondary {
       background: #ffffff;
-      color: #14352e;
+      color: var(--dd-button, #14352e);
     }
     button:focus-visible {
       outline: 3px solid #1d4ed8;
@@ -322,6 +349,7 @@ function mountPanel(session, startedAt) {
       if (result && result.ok && result.text) {
         state.source = "gemini";
         state.liveText = result.text;
+        state.liveUrl = result.url || "";
         state.suggestionId = "gemini-live";
         state.fallbackNote = "";
       } else {
@@ -329,6 +357,7 @@ function mountPanel(session, startedAt) {
         const next = distractionDuckNextSuggestion(current.birdMode, kind, state.suggestionId);
         state.source = "prewritten";
         state.liveText = null;
+        state.liveUrl = "";
         state.suggestionId = next ? next.id : null;
         state.fallbackNote = "Gemini did not reply, so this is a saved line.";
       }
@@ -351,7 +380,7 @@ function mountPanel(session, startedAt) {
     if (!id) {
       return;
     }
-    chrome.runtime.sendMessage({ type: "openSuggestion", id });
+    chrome.runtime.sendMessage({ type: "openSuggestion", id, url: openButton.dataset.url || "" });
   });
 
   const pause = document.createElement("button");

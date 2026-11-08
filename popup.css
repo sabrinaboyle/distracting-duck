@@ -13,6 +13,37 @@
   --focus: #1d4ed8;
   --stripe: #b45309;
   --error: #7f1d1d;
+  --meter-fill: linear-gradient(90deg, #b45309, #14352e);
+}
+
+body[data-bird-mode="malicious-mallard"] {
+  --bg: #fdecec;
+  --ink: #3f0d0d;
+  --muted: #7f1d1d;
+  --line: #b91c1c;
+  --hint: #9f1239;
+  --placeholder: #9f1239;
+  --button: #991b1b;
+  --button-hover: #7f1d1d;
+  --focus: #be123c;
+  --stripe: #b91c1c;
+  --error: #7f1d1d;
+  --meter-fill: linear-gradient(90deg, #dc2626, #7f1d1d);
+}
+
+body[data-bird-mode="locked-in-loon"] {
+  --bg: #eef4ff;
+  --ink: #0f2744;
+  --muted: #1e3a5f;
+  --line: #1d4ed8;
+  --hint: #1e40af;
+  --placeholder: #3b82f6;
+  --button: #1e40af;
+  --button-hover: #1e3a8a;
+  --focus: #2563eb;
+  --stripe: #1d4ed8;
+  --error: #1e3a8a;
+  --meter-fill: linear-gradient(90deg, #60a5fa, #1e3a8a);
 }
 
 *,
@@ -320,7 +351,7 @@ button.secondary:hover {
 .meter-fill {
   height: 100%;
   width: 50%;
-  background: linear-gradient(90deg, #b45309, #14352e);
+  background: var(--meter-fill);
 }
 
 @media (prefers-reduced-motion: no-preference) {

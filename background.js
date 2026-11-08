@@ -182,15 +182,19 @@ async function writeGeminiPool(pool) {
   });
 }
 
-function suggestionTextsFromPayload(payload) {
+function suggestionItemsFromPayload(payload) {
   if (!payload || payload.source !== "gemini") {
     return [];
+  }
+  const fromSuggestions = Array.isArray(payload.suggestions) ? payload.suggestions : [];
+  if (fromSuggestions.length) {
+    return fromSuggestions;
   }
   const fromList = Array.isArray(payload.texts)
     ? payload.texts.filter((item) => typeof item === "string" && item.trim())
     : [];
   if (fromList.length) {
-    return fromList.map((item) => item.trim());
+    return fromList;
   }
   const one = typeof payload.text === "string" ? payload.text.trim() : "";
   return one ? [one] : [];
@@ -215,11 +219,11 @@ async function fetchGeminiSuggestions(birdMode, count) {
         return { ok: false, reason: "gemini_http" };
       }
       const payload = await response.json();
-      const texts = suggestionTextsFromPayload(payload);
-      if (!texts.length) {
+      const items = suggestionItemsFromPayload(payload);
+      if (!items.length) {
         return { ok: false, reason: "gemini_empty" };
       }
-      return { ok: true, texts };
+      return { ok: true, items };
     } catch {
       return { ok: false, reason: "gemini_network" };
     } finally {
@@ -235,7 +239,7 @@ async function popGeminiPooled(birdMode) {
   return withGeminiPoolGate(async () => {
     const taken = distractionDuckTakeGeminiPooled(await readGeminiPool(), birdMode);
     await writeGeminiPool(taken.pool);
-    return taken.text;
+    return taken;
   });
 }
 
@@ -258,7 +262,7 @@ async function fillGeminiPoolToSize(birdMode) {
       distractionDuckAddGeminiPooled(
         latest,
         birdMode,
-        fetched.texts,
+        fetched.items,
         DISTRACTION_DUCK_SETTINGS.geminiPoolSize,
       ),
     );
@@ -275,16 +279,16 @@ async function takeGeminiSuggestion() {
     return { ok: false, reason: "no_session" };
   }
   const birdMode = session.birdMode;
-  let text = await popGeminiPooled(birdMode);
-  if (text) {
+  let taken = await popGeminiPooled(birdMode);
+  if (taken.text) {
     fillGeminiPoolSoon(birdMode);
-    return { ok: true, text, source: "gemini" };
+    return { ok: true, text: taken.text, url: taken.url, source: "gemini" };
   }
   await fillGeminiPoolToSize(birdMode);
-  text = await popGeminiPooled(birdMode);
-  if (text) {
+  taken = await popGeminiPooled(birdMode);
+  if (taken.text) {
     fillGeminiPoolSoon(birdMode);
-    return { ok: true, text, source: "gemini" };
+    return { ok: true, text: taken.text, url: taken.url, source: "gemini" };
   }
   return { ok: false, reason: "gemini_empty" };
 }
@@ -294,22 +298,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return;
   }
   if (message.type === "openSuggestion") {
+    const fromMessage = distractionDuckSafeHttpUrl(message.url);
     const suggestion = distractionDuckSuggestionById(message.id);
-    if (!suggestion || !suggestion.url) {
+    const target = fromMessage || (suggestion && suggestion.url) || "";
+    if (!target) {
       sendResponse({ ok: false });
       return;
     }
-    try {
-      const url = new URL(suggestion.url);
-      if (url.protocol !== "http:" && url.protocol !== "https:") {
-        sendResponse({ ok: false });
-        return;
-      }
-    } catch {
-      sendResponse({ ok: false });
-      return;
-    }
-    chrome.tabs.create({ url: suggestion.url }).then(
+    chrome.tabs.create({ url: target }).then(
       () => sendResponse({ ok: true }),
       () => sendResponse({ ok: false }),
     );

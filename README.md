@@ -4,7 +4,7 @@ HACK.COMS project. Lock-in tool using reverse psychology.
 
 ## This version
 
-You can add several focus websites and several distracting websites, choose a bird, and run a local focus session. Chrome asks to allow only the sites on those lists. A playful meter moves with time on those sites. It is not a measure of attention or productivity.
+You can add several focus websites and several distracting websites, choose a bird, and run a local focus session. Chrome asks to allow only the sites on those lists. A playful meter moves with time on those sites. It is not a measure of attention or productivity. The popup and bird panel follow the selected bird: warm default for Distracted Duck, red for Malicious Mallard, and blue for Locked-in Loon.
 
 ### Preserve from earlier steps
 
@@ -43,7 +43,7 @@ Keyboard: Tab through Add, Remove, mode radios, Pause, Stop, Dismiss, Another su
 
 ## Gemini suggestions (optional, local)
 
-When a session starts, the worker asks the local server for a few Gemini lines and stores them on this computer. **Another suggestion** uses a stored line right away, then refills the pool in the background. Gemini can take up to a minute; the panel only waits that long if the pool is empty. The extension sends only the selected bird mode. It does not send the page, your history, or your task. The API key stays in your environment, not in the extension.
+When a session starts, the worker asks the local server for a few Gemini lines and stores them on this computer. **Another suggestion** uses a stored line right away, then refills the pool in the background. Gemini can take up to a minute; the panel only waits that long if the pool is empty. Gemini lines can include a public https link and **Open this page**, like the prewritten suggestions. The panel wraps the full line, including the URL. The extension sends only the selected bird mode. It does not send the page, your history, or your task. The API key stays in your environment, not in the extension.
 
 ### Set the key (do this in your own terminal, not in chat)
 
