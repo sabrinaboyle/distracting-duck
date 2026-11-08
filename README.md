@@ -4,34 +4,39 @@ HACK.COMS project. Lock-in tool using reverse psychology.
 
 ## This step
 
-The toolbar popup can start and stop a focus session.
+During an active focus session, Malicious Mallard appears on the distracting website you chose. The panel has one prewritten message and a Dismiss button. It stays off other websites, and it goes away when the session is stopped.
 
-Start saves three things on this computer: the task, the distracting website, and the browser tab that was open when you clicked Start (the work tab). Closing the popup does not end the session. Opening it again shows the same active session and a Stop button. Stop clears the saved session and returns to the form.
+Start still saves your task, that website, and the work tab (the tab that was open when you clicked the icon). Chrome asks to allow the selected website before the session starts. That grant is only for that site, and Stop removes it.
 
 ### Files
 
-- `manifest.json` tells Chrome this is a Manifest V3 extension, which page to open as the popup, and that the popup may store data locally and read the tab that was active when you clicked the icon.
-- `popup.html` is the popup. It has the start form and the active-session screen.
-- `popup.css` sets the popup size, colors, spacing, and keyboard focus outline.
-- `popup.js` saves the session, restores it when the popup opens, and clears it when you press Stop.
+- `manifest.json` names the extension, the popup, and the background worker. `storage` and `activeTab` support the session. `scripting` lets the worker add the panel. `optional_host_permissions` lists the sites the extension is allowed to ask for later. Nothing is granted for those sites until you start a session.
+- `popup.html` and `popup.css` are the toolbar popup.
+- `popup.js` asks Chrome for the selected website, then saves the session.
+- `site-match.js` turns a website address into the origin Chrome can grant, and checks whether a tab is that same site.
+- `background.js` is the service worker. It watches for visits and tab switches, and adds the panel only on the selected site while the session is active.
+- `duck-panel.js` draws the panel inside a shadow root so the website’s styles don’t change it. It refuses to add a second panel in the same page.
 
 ### Load it in Chrome
 
-1. Open Chrome and go to `chrome://extensions`.
+1. Open `chrome://extensions`.
 2. Turn on **Developer mode**.
-3. Click **Load unpacked** and choose this project folder (the folder that contains `manifest.json`).
-4. Pin **Distraction Duck** from the extensions puzzle-piece menu.
-5. If the extension was already loaded, click the reload icon on its card after pulling these changes. Chrome asks you to accept the new storage permission.
+3. Click **Load unpacked** and choose this project folder.
+4. If Distraction Duck was already loaded, click its reload icon. Accept the new permissions. Site access is still requested later, one website at a time.
 
-### Test the session
+### Test the panel
 
-1. Open the tab you want to treat as your work tab, such as a reading or notes page.
-2. Click the Distraction Duck icon.
-3. Enter a task and one website, such as `https://example.com`, then choose **Start focus session**.
-4. The popup should switch to “Focus session is active” and list the task, the website, and the work tab. **Stop focus session** is the next button.
-5. Close the popup, then open it again. The same active session should still be there.
-6. Choose **Stop focus session**. The form comes back in that same popup, with the task and website still filled in. Close the popup and open it again. The session stays stopped, and the fields are empty because Stop cleared the saved session.
+1. Open the tab you want as your work tab. Leave a different site, such as `https://example.org`, in that tab.
+2. Open Distraction Duck. Enter a task and `https://example.com`. Choose **Start focus session**.
+3. Chrome asks to allow Distraction Duck on example.com. Choose **Allow**. The popup should show the active session.
+4. Open `https://example.com`. One Malicious Mallard panel appears, with the message and **Dismiss**. The work tab does not get a panel.
+5. Open another site, such as `https://example.org`. No panel.
+6. Switch back to the example.com tab. There is still one panel, not two.
+7. Reload example.com. One panel appears again.
+8. Choose **Dismiss**, switch to another tab, then switch back. The panel stays gone.
+9. Reload example.com. One panel comes back, because this is a new page load during the active session.
+10. Open the popup and choose **Stop focus session**. The panel disappears. Visit example.com again. The panel stays away.
 
-Press Tab to move through the fields and buttons. Starting with an empty field, or a website without `https://`, shows an error and does not save a session.
+Press Tab to reach **Dismiss**, then Enter. Escape also dismisses the panel while that button is focused.
 
 After you change a file, reload Distraction Duck on `chrome://extensions`.
