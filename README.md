@@ -2,41 +2,39 @@
 
 HACK.COMS project. Lock-in tool using reverse psychology.
 
-## This step
+## This version
 
-During an active focus session, Malicious Mallard appears on the distracting website you chose. The panel has one prewritten message and a Dismiss button. It stays off other websites, and it goes away when the session is stopped.
+You can add several focus websites and several distracting websites, choose a bird, and run a local focus session. Chrome asks to allow only the sites on those lists. A playful meter moves with time on those sites. It is not a measure of attention or productivity.
 
-Start still saves your task, that website, and the work tab (the tab that was open when you clicked the icon). Chrome asks to allow the selected website before the session starts. That grant is only for that site, and Stop removes it.
+### Preserve from earlier steps
+
+The popup still saves a session on this computer, remembers the work tab, and restores it when you reopen the popup. Stop still ends the session. The bird still uses a shadow-root panel, stays off sites you did not select, and Dismiss still hides it until the next page load.
 
 ### Files
 
-- `manifest.json` names the extension, the popup, and the background worker. `storage` and `activeTab` support the session. `scripting` lets the worker add the panel. `optional_host_permissions` lists the sites the extension is allowed to ask for later. Nothing is granted for those sites until you start a session.
-- `popup.html` and `popup.css` are the toolbar popup.
-- `popup.js` asks Chrome for the selected website, then saves the session.
-- `site-match.js` turns a website address into the origin Chrome can grant, and checks whether a tab is that same site.
-- `background.js` is the service worker. It watches for visits and tab switches, and adds the panel only on the selected site while the session is active.
-- `duck-panel.js` draws the panel inside a shadow root so the website’s styles don’t change it. It refuses to add a second panel in the same page.
+- `manifest.json` — Manifest V3, popup, worker, `storage`, `activeTab`, `scripting`, `idle`, and optional host access.
+- `settings.js` — Simple rates and list limits you can change later.
+- `site-match.js` — Origins, same-site checks, and list overlap.
+- `session.js` — Session shape, including older single-site sessions.
+- `meter.js` — Time-based meter math.
+- `suggestions.js` — Prewritten lines, tagged so a later Gemini source could replace them.
+- `popup.html`, `popup.css`, `popup.js` — Lists, conflict choice, bird mode, meter, pause, stop.
+- `background.js` — Site permission cleanup, panel inject, meter phase from the active tab.
+- `duck-panel.js` — Bird panel, another suggestion, optional open, pause, dismiss.
+- `test/logic.test.js` — Origin, conflict, meter, and suggestion checks without Chrome.
 
 ### Load it in Chrome
 
 1. Open `chrome://extensions`.
-2. Turn on **Developer mode**.
-3. Click **Load unpacked** and choose this project folder.
-4. If Distraction Duck was already loaded, click its reload icon. Accept the new permissions. Site access is still requested later, one website at a time.
+2. Turn on Developer mode.
+3. Load unpacked (this folder), or reload if it is already loaded.
+4. Accept the new `idle` permission if Chrome asks. Site access is still requested later, one start at a time, only for the websites on your lists.
 
-### Test the panel
+### Test
 
-1. Open the tab you want as your work tab. Leave a different site, such as `https://example.org`, in that tab.
-2. Open Distraction Duck. Enter a task and `https://example.com`. Choose **Start focus session**.
-3. Chrome asks to allow Distraction Duck on example.com. Choose **Allow**. The popup should show the active session.
-4. Open `https://example.com`. One Malicious Mallard panel appears, with the message and **Dismiss**. The work tab does not get a panel.
-5. Open another site, such as `https://example.org`. No panel.
-6. Switch back to the example.com tab. There is still one panel, not two.
-7. Reload example.com. One panel appears again.
-8. Choose **Dismiss**, switch to another tab, then switch back. The panel stays gone.
-9. Reload example.com. One panel comes back, because this is a new page load during the active session.
-10. Open the popup and choose **Stop focus session**. The panel disappears. Visit example.com again. The panel stays away.
+1. Add `https://example.org` as a focus site and `https://example.com` as a distracting site. Try adding `https://example.com` to focus: choose which list it belongs on.
+2. Start a session, Allow the sites, and confirm the work tab is listed.
+3. Open example.com: the bird appears, Dismiss is focused, the meter is visible. Open example.org in Distracted Duck: no panel. Switch to Locked-in Loon: a panel appears on the focus site.
+4. Stay on a listed site and watch the meter in the popup. Switch to a site on neither list: the meter holds. Pause: the bird hides and the meter holds. Resume, then Stop: the bird stays gone.
 
-Press Tab to reach **Dismiss**, then Enter. Escape also dismisses the panel while that button is focused.
-
-After you change a file, reload Distraction Duck on `chrome://extensions`.
+Keyboard: Tab through Add, Remove, mode radios, Pause, Stop, Dismiss, Another suggestion. Escape dismisses the panel. Reduced-motion turns off the meter’s width animation. There is no sound.

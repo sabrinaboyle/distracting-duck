@@ -24,10 +24,12 @@
 html,
 body {
   width: 22.5rem;
+  max-height: 34rem;
   margin: 0;
 }
 
 body {
+  overflow: auto;
   background: var(--bg);
   color: var(--ink);
   font: 1rem/1.45 "Segoe UI", system-ui, sans-serif;
@@ -174,4 +176,161 @@ input:focus-visible,
 button:focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+legend {
+  padding: 0;
+  font-weight: 600;
+}
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.choices label {
+  display: flex;
+  gap: 0.45rem;
+  align-items: flex-start;
+  font-weight: 400;
+}
+
+.choices input {
+  width: auto;
+  min-height: 1.25rem;
+  margin-top: 0.2rem;
+}
+
+.site-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.site-list:empty::after {
+  content: "None yet.";
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.site-item {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.site-item span {
+  overflow-wrap: anywhere;
+}
+
+.add-row,
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.add-row input {
+  flex: 1 1 8rem;
+}
+
+.add-row button,
+.button-row button,
+.site-item button {
+  margin-top: 0;
+  width: auto;
+  flex: 1 1 auto;
+}
+
+.site-item button {
+  min-height: 2.25rem;
+  padding: 0.3rem 0.6rem;
+  flex: 0 0 auto;
+}
+
+button.secondary {
+  background: var(--field);
+  color: var(--button);
+}
+
+button.secondary:hover {
+  background: #ece7dc;
+}
+
+.conflict {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: #fff7ed;
+}
+
+.conflict[hidden] {
+  display: none;
+}
+
+.meter-block {
+  margin: 0 0 1rem;
+}
+
+.meter-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.meter-track {
+  height: 0.9rem;
+  margin: 0.35rem 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #e7e5e4;
+  overflow: hidden;
+}
+
+.meter-fill {
+  height: 100%;
+  width: 50%;
+  background: linear-gradient(90deg, #b45309, #14352e);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .meter-fill {
+    transition: width 0.35s linear;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .meter-fill {
+    transition: none;
+  }
 }
