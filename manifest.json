@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
   "name": "Distraction Duck",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "A local focus session with a time-based meter and a bird that appears on sites you choose.",
   "permissions": ["storage", "activeTab", "scripting", "idle"],
+  "host_permissions": ["http://127.0.0.1:8787/*"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
   "background": {
     "service_worker": "background.js"
