@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Distraction Duck",
-  "version": "0.3.0",
-  "description": "During a focus session, Malicious Mallard appears on the distracting website you chose.",
-  "permissions": ["storage", "activeTab", "scripting"],
+  "version": "0.4.0",
+  "description": "A local focus session with a time-based meter and a bird that appears on sites you choose.",
+  "permissions": ["storage", "activeTab", "scripting", "idle"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
   "background": {
     "service_worker": "background.js"
