@@ -170,16 +170,16 @@ async function fetchGeminiSuggestion() {
       signal: controller.signal,
     });
     if (!response.ok) {
-      return { ok: false };
+      return { ok: false, reason: "gemini_http" };
     }
     const payload = await response.json();
     const text = typeof payload.text === "string" ? payload.text.trim() : "";
     if (!text || payload.source !== "gemini") {
-      return { ok: false };
+      return { ok: false, reason: "gemini_empty" };
     }
     return { ok: true, text, source: "gemini" };
   } catch {
-    return { ok: false };
+    return { ok: false, reason: "gemini_network" };
   } finally {
     clearTimeout(timer);
   }
