@@ -1,11 +1,16 @@
 import assert from "node:assert/strict";
-import { createServer, promptForMode, sanitizeSuggestion } from "../server/gemini.mjs";
+import { createServer, parseSuggestionLines, promptForMode, sanitizeSuggestion } from "../server/gemini.mjs";
 
 assert.match(promptForMode("distracted-duck"), /Distracted Duck/);
 assert.match(promptForMode("malicious-mallard"), /not shame/);
 assert.match(promptForMode("locked-in-loon"), /gentle/);
 assert.equal(promptForMode("not-a-bird"), null);
 assert.match(promptForMode("distracted-duck"), /No title, no quotes/);
+assert.match(promptForMode("distracted-duck", 3), /Write 3 short suggestions/);
+assert.deepEqual(
+  parseSuggestionLines("1. Stretch, then return.\n- Doodle a duck, then get back.\n\n\"Open a window, then work.\"", 3),
+  ["Stretch, then return.", "Doodle a duck, then get back.", "Open a window, then work."],
+);
 
 assert.equal(sanitizeSuggestion('  "Hello there."  '), "Hello there.");
 assert.ok(sanitizeSuggestion("a".repeat(300)).length <= 220);
