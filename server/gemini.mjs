@@ -20,7 +20,7 @@ const MODE_PROMPTS = {
   "distracted-duck":
     "You are Distracted Duck, a playful Chrome-extension bird. Each short suggestion (one or two sentences) offers a harmless, silly detour and then a nudge back to work.",
   "malicious-mallard":
-    "You are Malicious Mallard, a mischievous but not cruel Chrome-extension bird. Each short suggestion (one or two sentences) is cheeky. Do not shame, insult, or attack the reader.",
+    "You are Malicious Mallard, a mischievous but not cruel Chrome-extension bird. Each short suggestion (one or two sentences) is a cheeky, tempting detour. Do not shame, insult, or attack the reader.",
   "locked-in-loon":
     "You are Locked-in Loon, a gentle Chrome-extension bird. Each short suggestion (one or two sentences) is encouraging or a light reminder. No guilt.",
 };
@@ -73,8 +73,31 @@ export function promptForMode(birdMode, count = 1) {
   return [
     voice,
     howMany,
-    "Rules: reply with only the suggestion text. No title, no quotes, no list, no website URLs, no user task, no browsing history, no page content.",
+    "Each suggestion must include one tempting https URL to a public page such as Wikipedia, YouTube, Reddit, or a news homepage. Put the full URL at the end of the line.",
+    "Rules: reply with only the suggestion lines. Keep each line short enough to read in a small panel, including the URL. No title, no quotes, no extra list markers, no user task, no browsing history, no page content.",
   ].join(" ");
+}
+
+export function extractHttpUrl(text) {
+  if (typeof text !== "string") {
+    return "";
+  }
+  const match = text.match(/https?:\/\/[^\s<>"']+/i);
+  if (!match) {
+    return "";
+  }
+  try {
+    const url = new URL(match[0].replace(/[.,;:!?)]+$/, ""));
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return "";
+    }
+    if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
+      return "";
+    }
+    return url.href;
+  } catch {
+    return "";
+  }
 }
 
 export function sanitizeSuggestion(text) {
@@ -85,8 +108,13 @@ export function sanitizeSuggestion(text) {
   if ((cleaned.startsWith('"') && cleaned.endsWith('"')) || (cleaned.startsWith("'") && cleaned.endsWith("'"))) {
     cleaned = cleaned.slice(1, -1).trim();
   }
-  if (cleaned.length > 220) {
-    cleaned = `${cleaned.slice(0, 217).trim()}…`;
+  const url = extractHttpUrl(cleaned);
+  if (cleaned.length > 400) {
+    let body = url ? cleaned.replace(url, "").replace(/\s+/g, " ").trim() : cleaned;
+    if (body.length > 280) {
+      body = `${body.slice(0, 277).trim()}…`;
+    }
+    cleaned = url ? `${body} ${url}` : `${body.slice(0, 397).trim()}…`;
   }
   return cleaned;
 }
@@ -131,14 +159,14 @@ export function parseSuggestionLines(text, count = 1) {
       continue;
     }
     seen.add(line);
-    unique.push(line);
+    unique.push({ text: line, url: extractHttpUrl(line) });
     if (unique.length >= n) {
       break;
     }
   }
   if (!unique.length) {
     const one = sanitizeSuggestion(text);
-    return one ? [one] : [];
+    return one ? [{ text: one, url: extractHttpUrl(one) }] : [];
   }
   return unique;
 }
@@ -190,14 +218,22 @@ async function generateSuggestion(birdMode, count = 1) {
     }
 
     const data = await apiResponse.json();
-    const texts = parseSuggestionLines(rawTextFromGemini(data), n);
-    if (!texts.length) {
+    const suggestions = parseSuggestionLines(rawTextFromGemini(data), n);
+    if (!suggestions.length) {
       lastError = "gemini_empty";
       console.log(`Gemini ${model} returned no text`);
       continue;
     }
-    console.log(`Gemini ${model} ok (${texts.length})`);
-    return { status: 200, body: { text: texts[0], texts, source: "gemini" } };
+    console.log(`Gemini ${model} ok (${suggestions.length})`);
+    return {
+      status: 200,
+      body: {
+        text: suggestions[0].text,
+        texts: suggestions.map((item) => item.text),
+        suggestions,
+        source: "gemini",
+      },
+    };
   }
   return { status: 502, body: { error: lastError } };
 }

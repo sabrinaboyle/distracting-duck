@@ -8,6 +8,51 @@ function distractionDuckEmptyGeminiPool() {
   return pool;
 }
 
+function distractionDuckSafeHttpUrl(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  try {
+    var url = new URL(value.trim());
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return "";
+    }
+    if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
+      return "";
+    }
+    return url.href;
+  } catch {
+    return "";
+  }
+}
+
+function distractionDuckSafeHttpUrlFromText(text) {
+  if (typeof text !== "string") {
+    return "";
+  }
+  var match = text.match(/https?:\/\/[^\s<>"']+/i);
+  if (!match) {
+    return "";
+  }
+  return distractionDuckSafeHttpUrl(match[0].replace(/[.,;:!?)]+$/, ""));
+}
+
+function distractionDuckGeminiPoolItem(raw) {
+  var text = "";
+  var url = "";
+  if (typeof raw === "string") {
+    text = raw.replace(/\s+/g, " ").trim();
+    url = distractionDuckSafeHttpUrlFromText(text);
+  } else if (raw && typeof raw === "object" && typeof raw.text === "string") {
+    text = raw.text.replace(/\s+/g, " ").trim();
+    url = distractionDuckSafeHttpUrl(raw.url) || distractionDuckSafeHttpUrlFromText(text);
+  }
+  if (!text) {
+    return null;
+  }
+  return { text: text, url: url };
+}
+
 function distractionDuckNormalizeGeminiPool(raw) {
   var pool = distractionDuckEmptyGeminiPool();
   if (!raw || typeof raw !== "object") {
@@ -18,12 +63,12 @@ function distractionDuckNormalizeGeminiPool(raw) {
     var seen = {};
     pool[mode] = [];
     for (var i = 0; i < list.length; i += 1) {
-      var text = typeof list[i] === "string" ? list[i].replace(/\s+/g, " ").trim() : "";
-      if (!text || seen[text]) {
+      var item = distractionDuckGeminiPoolItem(list[i]);
+      if (!item || seen[item.text]) {
         continue;
       }
-      seen[text] = true;
-      pool[mode].push(text);
+      seen[item.text] = true;
+      pool[mode].push(item);
       if (pool[mode].length >= 8) {
         break;
       }
@@ -35,10 +80,10 @@ function distractionDuckNormalizeGeminiPool(raw) {
 function distractionDuckTakeGeminiPooled(pool, birdMode) {
   var next = distractionDuckNormalizeGeminiPool(pool);
   if (!Object.prototype.hasOwnProperty.call(next, birdMode)) {
-    return { text: "", pool: next };
+    return { text: "", url: "", pool: next };
   }
-  var text = next[birdMode].shift() || "";
-  return { text: text, pool: next };
+  var item = next[birdMode].shift() || { text: "", url: "" };
+  return { text: item.text || "", url: item.url || "", pool: next };
 }
 
 function distractionDuckAddGeminiPooled(pool, birdMode, texts, maxSize) {
@@ -50,15 +95,15 @@ function distractionDuckAddGeminiPooled(pool, birdMode, texts, maxSize) {
   var existing = next[birdMode];
   var seen = {};
   existing.forEach(function (item) {
-    seen[item] = true;
+    seen[item.text] = true;
   });
-  (Array.isArray(texts) ? texts : []).forEach(function (item) {
-    var text = typeof item === "string" ? item.replace(/\s+/g, " ").trim() : "";
-    if (!text || seen[text] || existing.length >= cap) {
+  (Array.isArray(texts) ? texts : []).forEach(function (raw) {
+    var item = distractionDuckGeminiPoolItem(raw);
+    if (!item || seen[item.text] || existing.length >= cap) {
       return;
     }
-    seen[text] = true;
-    existing.push(text);
+    seen[item.text] = true;
+    existing.push(item);
   });
   return next;
 }

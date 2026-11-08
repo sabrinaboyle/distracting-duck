@@ -101,5 +101,15 @@ assert(taken.text === "Stretch, then come back.", "take first pooled line");
 assert(taken.pool["distracted-duck"].length === 1, "pool shrinks after take");
 assert(context.distractionDuckGeminiPoolNeedsFill(taken.pool, "distracted-duck", 3) === true, "pool needs refill");
 assert(context.distractionDuckGeminiPoolNeedsFill(filled, "not-a-bird", 3) === false, "unknown mode skip");
+assert(context.distractionDuckModeById("malicious-mallard").theme.stripe === "#b91c1c", "mallard red");
+assert(context.distractionDuckModeById("locked-in-loon").theme.stripe === "#1d4ed8", "loon blue");
+const linked = context.distractionDuckAddGeminiPooled(
+  context.distractionDuckEmptyGeminiPool(),
+  "malicious-mallard",
+  ["Peek at https://en.wikipedia.org/wiki/Procrastination then paddle back."],
+  3,
+);
+assert(linked["malicious-mallard"][0].url === "https://en.wikipedia.org/wiki/Procrastination", "store gemini url");
+assert(context.distractionDuckSafeHttpUrl("javascript:alert(1)") === "", "reject non-http");
 
 console.log("logic tests passed");
