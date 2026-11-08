@@ -7,8 +7,14 @@ const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 loadDotEnv(path.join(ROOT, ".env"));
 
 const PORT = Number(process.env.PORT || 8787);
-const MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash";
 const KEY = process.env.GEMINI_API_KEY || "";
+const DEFAULT_MODELS = [
+  process.env.GEMINI_MODEL,
+  "gemini-2.5-flash",
+  "gemini-3.8-flash",
+  "gemini-3.6-flash",
+  "gemini-2.0-flash",
+].filter((name, index, list) => name && list.indexOf(name) === index);
 
 const MODE_PROMPTS = {
   "distracted-duck":
@@ -71,14 +77,31 @@ export function sanitizeSuggestion(text) {
   return cleaned;
 }
 
+function corsHeaders() {
+  return {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+    "Access-Control-Allow-Headers": "content-type",
+    "Access-Control-Allow-Private-Network": "true",
+  };
+}
+
 function json(response, status, body) {
   const payload = JSON.stringify(body);
   response.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
     "Content-Length": Buffer.byteLength(payload),
-    "Access-Control-Allow-Origin": "null",
+    ...corsHeaders(),
   });
   response.end(payload);
+}
+
+function textFromGemini(data) {
+  const parts = data?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(parts)) {
+    return "";
+  }
+  return sanitizeSuggestion(parts.map((part) => part.text || "").join(" "));
 }
 
 async function readBody(request) {
@@ -102,42 +125,47 @@ async function generateSuggestion(birdMode) {
     return { status: 503, body: { error: "gemini_unconfigured" } };
   }
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
-  const apiResponse = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": apiKey,
-    },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.9,
-        maxOutputTokens: 80,
+  let lastError = "gemini_unavailable";
+  for (const model of DEFAULT_MODELS) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+    const apiResponse = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
       },
-    }),
-  });
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.9,
+          maxOutputTokens: 256,
+        },
+      }),
+    });
 
-  if (!apiResponse.ok) {
-    return { status: 502, body: { error: "gemini_unavailable" } };
-  }
+    if (!apiResponse.ok) {
+      lastError = "gemini_unavailable";
+      console.log(`Gemini ${model} HTTP ${apiResponse.status}`);
+      continue;
+    }
 
-  const data = await apiResponse.json();
-  const text = sanitizeSuggestion(data?.candidates?.[0]?.content?.parts?.[0]?.text || "");
-  if (!text) {
-    return { status: 502, body: { error: "gemini_empty" } };
+    const data = await apiResponse.json();
+    const text = textFromGemini(data);
+    if (!text) {
+      lastError = "gemini_empty";
+      console.log(`Gemini ${model} returned no text`);
+      continue;
+    }
+    console.log(`Gemini ${model} ok`);
+    return { status: 200, body: { text, source: "gemini" } };
   }
-  return { status: 200, body: { text, source: "gemini" } };
+  return { status: 502, body: { error: lastError } };
 }
 
 export function createServer() {
   return http.createServer(async (request, response) => {
     if (request.method === "OPTIONS") {
-      response.writeHead(204, {
-        "Access-Control-Allow-Origin": "null",
-        "Access-Control-Allow-Methods": "POST, GET",
-        "Access-Control-Allow-Headers": "content-type",
-      });
+      response.writeHead(204, corsHeaders());
       response.end();
       return;
     }
